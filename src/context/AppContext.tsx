@@ -116,7 +116,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addToast = (message: string, type: "success" | "info" | "error" = "success") => {
-    const id = Date.now();
+    const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       removeToast(id);
