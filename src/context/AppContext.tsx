@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { Product, CartItem, UserProfile } from "@/lib/types";
 import { productService, userService } from "@/lib/services/storeService";
 
@@ -31,13 +32,15 @@ interface AppContextType {
   updateProfile: (profile: UserProfile) => void;
   refreshProducts: () => void;
   trackProductView: (productId: string) => void;
-  login: (email: string, role: "admin" | "customer") => void;
-  logout: () => void;
+  login: (username: string) => Promise<boolean>;
+  googleLogin: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -52,11 +55,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProducts(productService.getProducts());
     setRecentlyViewed(productService.getRecentlyViewed());
 
-    const storedUser = localStorage.getItem("premium_petshop_user");
-    if (storedUser) {
-      try { setUser(JSON.parse(storedUser)); } catch { setUser(null); }
-    }
-
     const storedCart = localStorage.getItem("premium_petshop_cart");
     if (storedCart) {
       try { setCart(JSON.parse(storedCart)); } catch { setCart([]); }
@@ -69,6 +67,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setHydrated(true);
   }, []);
+
+  // Sync NextAuth session with AppContext user profile
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const email = session.user.email || "";
+      const isOwner = email === "admin@aurapet.com";
+      
+      setUser({
+        name: session.user.name || (isOwner ? "Store Administrator" : "Customer"),
+        email: email,
+        avatar: (session.user as any).avatar || session.user.image || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+        phone: (session.user as any).phone || (isOwner ? "+91 99999 99999" : "+91 98765 43210"),
+        addresses: [
+          {
+            id: "addr-1",
+            isDefault: true,
+            fullName: session.user.name || "Customer",
+            addressLine1: "Flat 402, Block B, Prestige Heights, Indiranagar",
+            city: "Bengaluru, Karnataka",
+            postalCode: "560038",
+            country: "India"
+          }
+        ],
+        savedCards: []
+      });
+    } else if (status === "unauthenticated") {
+      setUser(null);
+    }
+  }, [session, status]);
 
   // Sync cart to localstorage
   useEffect(() => {
@@ -188,7 +215,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateProfile = (newProfile: UserProfile) => {
     setUser(newProfile);
-    localStorage.setItem("premium_petshop_user", JSON.stringify(newProfile));
     userService.updateProfile(newProfile);
     addToast("Profile updated successfully!", "success");
   };
@@ -198,27 +224,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRecentlyViewed(productService.getRecentlyViewed());
   };
 
-  const login = (email: string, role: "admin" | "customer") => {
-    const defaultProfile = userService.getProfile();
-    const mockUser: UserProfile = {
-      ...defaultProfile,
-      email,
-      name: role === "admin" ? "Store Administrator" : defaultProfile.name,
-      avatar: role === "admin" 
-        ? "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"
-        : defaultProfile.avatar
-    };
-    
-    // Save to states
-    setUser(mockUser);
-    localStorage.setItem("premium_petshop_user", JSON.stringify(mockUser));
-    addToast(`Signed in successfully as ${mockUser.name}!`, "success");
+  const login = async (username: string): Promise<boolean> => {
+    try {
+      const result = await signIn("credentials", {
+        username,
+        password: "password",
+        redirect: false
+      });
+      if (result?.error) {
+        addToast("Authentication failed.", "error");
+        return false;
+      }
+      addToast("Signed in successfully!", "success");
+      return true;
+    } catch {
+      addToast("An error occurred during sign-in.", "error");
+      return false;
+    }
   };
 
-  const logout = () => {
+  const googleLogin = async () => {
+    try {
+      await signIn("google");
+    } catch {
+      addToast("Failed to initialize Google login.", "error");
+    }
+  };
+
+  const logout = async () => {
+    await signOut({ redirect: false });
     setUser(null);
-    localStorage.removeItem("premium_petshop_user");
-    addToast("Logged out successfully.", "info");
+    addToast("Signed out successfully.", "info");
   };
 
   return (
@@ -244,6 +280,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshProducts,
         trackProductView,
         login,
+        googleLogin,
         logout,
       }}
     >
