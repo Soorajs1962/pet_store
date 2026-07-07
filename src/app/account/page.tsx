@@ -72,6 +72,107 @@ function AccountContent() {
     router.push("/");
   };
 
+  // Address Manager Form State
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [addressForm, setAddressForm] = useState({
+    fullName: "",
+    addressLine1: "",
+    city: "",
+    postalCode: "",
+    country: "India",
+    isDefault: false
+  });
+
+  const handleSaveAddress = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    let updatedAddresses = [...user.addresses];
+
+    if (editingAddressId) {
+      // Editing existing address
+      updatedAddresses = updatedAddresses.map((addr) =>
+        addr.id === editingAddressId
+          ? { ...addr, ...addressForm }
+          : addressForm.isDefault ? { ...addr, isDefault: false } : addr
+      );
+      addToast("Address updated.", "success");
+    } else {
+      // Creating new address
+      const newAddress = {
+        id: `addr-${Date.now()}`,
+        ...addressForm
+      };
+      
+      if (addressForm.isDefault || updatedAddresses.length === 0) {
+        newAddress.isDefault = true;
+        updatedAddresses = updatedAddresses.map((addr) => ({ ...addr, isDefault: false }));
+      }
+      updatedAddresses.push(newAddress);
+      addToast("Address added.", "success");
+    }
+
+    updateProfile({
+      ...user,
+      addresses: updatedAddresses
+    });
+
+    // Reset form
+    setAddressForm({
+      fullName: "",
+      addressLine1: "",
+      city: "",
+      postalCode: "",
+      country: "India",
+      isDefault: false
+    });
+    setEditingAddressId(null);
+    setShowAddressForm(false);
+  };
+
+  const handleEditAddressClick = (addr: any) => {
+    setEditingAddressId(addr.id);
+    setAddressForm({
+      fullName: addr.fullName,
+      addressLine1: addr.addressLine1,
+      city: addr.city,
+      postalCode: addr.postalCode,
+      country: addr.country,
+      isDefault: addr.isDefault
+    });
+    setShowAddressForm(true);
+  };
+
+  const handleDeleteAddress = (id: string) => {
+    if (!user) return;
+    if (confirm("Delete this address?")) {
+      const updatedAddresses = user.addresses.filter((addr) => addr.id !== id);
+      // Ensure at least one address is default if any left
+      if (updatedAddresses.length > 0 && !updatedAddresses.some(a => a.isDefault)) {
+        updatedAddresses[0].isDefault = true;
+      }
+      updateProfile({
+        ...user,
+        addresses: updatedAddresses
+      });
+      addToast("Address deleted.", "info");
+    }
+  };
+
+  const handleSetDefaultAddress = (id: string) => {
+    if (!user) return;
+    const updatedAddresses = user.addresses.map((addr) => ({
+      ...addr,
+      isDefault: addr.id === id
+    }));
+    updateProfile({
+      ...user,
+      addresses: updatedAddresses
+    });
+    addToast("Default address updated.", "success");
+  };
+
   const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
   const pastOrders = orderService.getOrders();
   const isAdmin = user?.email === "admin@aurapet.com";
@@ -270,23 +371,170 @@ function AccountContent() {
 
                   {/* Addresses */}
                   <div>
-                    <h3 className="font-sans font-bold text-base text-primary border-b border-border-brand pb-4 mb-4">
-                      Saved Addresses
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {user.addresses.map((addr) => (
-                        <div key={addr.id} className="border border-border-brand rounded-2xl p-5 relative">
-                          <span className="text-[10px] uppercase font-bold text-accent mb-2 block flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5" /> Default Shipping Address
-                          </span>
-                          <h4 className="font-bold text-sm text-primary mb-1">{addr.fullName}</h4>
-                          <p className="text-xs text-secondary leading-relaxed font-light">
-                            {addr.addressLine1}, {addr.city}<br />
-                            {addr.postalCode}, {addr.country}
-                          </p>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between border-b border-border-brand pb-4 mb-4">
+                      <h3 className="font-sans font-bold text-base text-primary">
+                        Saved Addresses
+                      </h3>
+                      {!showAddressForm && (
+                        <button
+                          onClick={() => {
+                            setEditingAddressId(null);
+                            setAddressForm({
+                              fullName: "",
+                              addressLine1: "",
+                              city: "",
+                              postalCode: "",
+                              country: "India",
+                              isDefault: false
+                            });
+                            setShowAddressForm(true);
+                          }}
+                          className="px-4 py-2 bg-primary hover:bg-secondary text-white text-xs font-bold rounded-full transition-colors cursor-pointer flex items-center gap-1.5 animate-fade-in"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Address
+                        </button>
+                      )}
                     </div>
+
+                    {showAddressForm && (
+                      <form onSubmit={handleSaveAddress} className="bg-background rounded-2xl p-6 border border-border-brand mb-6 space-y-4 animate-fade-in">
+                        <h4 className="font-bold text-sm text-primary mb-2">
+                          {editingAddressId ? "Edit Address Details" : "Add Shipping Address"}
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-1.5">Recipient Full Name</label>
+                            <input
+                              type="text"
+                              required
+                              value={addressForm.fullName}
+                              onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 bg-white text-primary outline-none focus:border-primary font-medium"
+                              placeholder="e.g. Vikram Malhotra"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-1.5">Address Line 1</label>
+                            <input
+                              type="text"
+                              required
+                              value={addressForm.addressLine1}
+                              onChange={(e) => setAddressForm({ ...addressForm, addressLine1: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 bg-white text-primary outline-none focus:border-primary font-medium"
+                              placeholder="Flat/House No, Building, Street"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-1.5">City & State</label>
+                            <input
+                              type="text"
+                              required
+                              value={addressForm.city}
+                              onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 bg-white text-primary outline-none focus:border-primary font-medium"
+                              placeholder="e.g. Bengaluru, Karnataka"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-1.5">Postal Code</label>
+                            <input
+                              type="text"
+                              required
+                              value={addressForm.postalCode}
+                              onChange={(e) => setAddressForm({ ...addressForm, postalCode: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 bg-white text-primary outline-none focus:border-primary font-medium"
+                              placeholder="e.g. 560038"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-1.5">Country</label>
+                            <input
+                              type="text"
+                              required
+                              value={addressForm.country}
+                              onChange={(e) => setAddressForm({ ...addressForm, country: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 bg-white text-primary outline-none focus:border-primary font-medium"
+                              placeholder="e.g. India"
+                            />
+                          </div>
+                          <div className="flex items-center pt-5">
+                            <label className="flex items-center gap-2 text-xs text-primary font-medium cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={addressForm.isDefault}
+                                onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
+                                className="accent-primary"
+                              />
+                              Set as default shipping address
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddressForm(false)}
+                            className="px-5 py-2 border border-border-brand hover:bg-white text-primary text-xs font-bold rounded-full transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-5 py-2 bg-primary hover:bg-secondary text-white text-xs font-bold rounded-full transition-colors cursor-pointer"
+                          >
+                            Save Address
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {user.addresses.length === 0 ? (
+                      <div className="border border-dashed border-border-brand rounded-2xl p-8 text-center bg-white/50">
+                        <span className="text-xs text-secondary font-light block mb-1">No saved addresses found.</span>
+                        <span className="text-[10px] text-secondary/60 font-light block">Please add a shipping address to proceed with checkouts.</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {user.addresses.map((addr) => (
+                          <div key={addr.id} className="border border-border-brand rounded-2xl p-5 relative flex flex-col justify-between bg-white shadow-sm hover:border-primary transition-all">
+                            <div>
+                              {addr.isDefault ? (
+                                <span className="text-[9px] uppercase font-bold text-accent mb-2.5 flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5" /> Default Shipping Address
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleSetDefaultAddress(addr.id)}
+                                  className="text-[9px] uppercase font-bold text-secondary/60 hover:text-primary mb-2.5 block cursor-pointer transition-colors"
+                                >
+                                  Make Default
+                                </button>
+                              )}
+                              <h4 className="font-bold text-sm text-primary mb-1">{addr.fullName}</h4>
+                              <p className="text-xs text-secondary leading-relaxed font-light">
+                                {addr.addressLine1}, {addr.city}<br />
+                                {addr.postalCode}, {addr.country}
+                              </p>
+                            </div>
+                            <div className="flex justify-end gap-2 border-t border-border-brand pt-3 mt-4">
+                              <button
+                                onClick={() => handleEditAddressClick(addr)}
+                                className="text-xs text-primary hover:underline font-bold cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <span className="text-secondary/30">|</span>
+                              <button
+                                onClick={() => handleDeleteAddress(addr.id)}
+                                className="text-xs text-red-500 hover:underline font-bold cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

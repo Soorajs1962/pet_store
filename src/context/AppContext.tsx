@@ -73,25 +73,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (status === "authenticated" && session?.user) {
       const email = session.user.email || "";
       const isOwner = email === "admin@aurapet.com";
+      const storageKey = `premium_petshop_profile_${email}`;
+      const storedProfile = localStorage.getItem(storageKey);
       
-      setUser({
-        name: session.user.name || (isOwner ? "Store Administrator" : "Customer"),
-        email: email,
-        avatar: (session.user as any).avatar || session.user.image || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-        phone: (session.user as any).phone || (isOwner ? "+91 99999 99999" : "+91 98765 43210"),
-        addresses: [
-          {
-            id: "addr-1",
-            isDefault: true,
-            fullName: session.user.name || "Customer",
-            addressLine1: "Flat 402, Block B, Prestige Heights, Indiranagar",
-            city: "Bengaluru, Karnataka",
-            postalCode: "560038",
-            country: "India"
-          }
-        ],
-        savedCards: []
-      });
+      if (storedProfile) {
+        try {
+          setUser(JSON.parse(storedProfile));
+        } catch {
+          // fallback
+        }
+      } else {
+        const initialProfile = {
+          name: session.user.name || (isOwner ? "Store Administrator" : "Customer"),
+          email: email,
+          avatar: (session.user as any).avatar || session.user.image || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+          phone: (session.user as any).phone || "",
+          addresses: isOwner ? [
+            {
+              id: "addr-1",
+              isDefault: true,
+              fullName: "Store Administrator",
+              addressLine1: "Flat 402, Block B, Prestige Heights, Indiranagar",
+              city: "Bengaluru, Karnataka",
+              postalCode: "560038",
+              country: "India"
+            }
+          ] : [],
+          savedCards: []
+        };
+        setUser(initialProfile);
+        localStorage.setItem(storageKey, JSON.stringify(initialProfile));
+      }
     } else if (status === "unauthenticated") {
       setUser(null);
     }
@@ -216,6 +228,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = (newProfile: UserProfile) => {
     setUser(newProfile);
     userService.updateProfile(newProfile);
+    localStorage.setItem(`premium_petshop_profile_${newProfile.email}`, JSON.stringify(newProfile));
     addToast("Profile updated successfully!", "success");
   };
 

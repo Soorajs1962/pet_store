@@ -43,7 +43,8 @@ const handler = NextAuth({
             name: "Alexander Mercer",
             email: "alexander@mercer.com",
             role: "customer",
-            avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
+            avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
+            phone: "+91 98765 43210"
           };
         }
 
@@ -64,7 +65,8 @@ const handler = NextAuth({
                 name: foundUser.name,
                 email: foundUser.username.includes("@") ? foundUser.username : `${foundUser.username}@aurapet.com`,
                 role: "customer",
-                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+                phone: foundUser.phone || ""
               };
             }
           } catch {
@@ -82,6 +84,7 @@ const handler = NextAuth({
       if (user) {
         token.role = (user as any).role;
         token.avatar = (user as any).avatar;
+        token.phone = (user as any).phone;
       }
       return token;
     },
@@ -89,6 +92,7 @@ const handler = NextAuth({
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).avatar = token.avatar;
+        (session.user as any).phone = token.phone;
       }
       return session;
     }
