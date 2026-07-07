@@ -14,7 +14,7 @@ interface AppContextType {
   products: Product[];
   cart: CartItem[];
   wishlist: string[];
-  profile: UserProfile;
+  user: UserProfile | null;
   recentlyViewed: Product[];
   toasts: Toast[];
   cartOpen: boolean;
@@ -31,6 +31,8 @@ interface AppContextType {
   updateProfile: (profile: UserProfile) => void;
   refreshProducts: () => void;
   trackProductView: (productId: string) => void;
+  login: (email: string, role: "admin" | "customer") => void;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -39,7 +41,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
-  const [profile, setProfile] = useState<UserProfile>(userService.getProfile());
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -48,8 +50,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Sync client-side state on mount
   useEffect(() => {
     setProducts(productService.getProducts());
-    setProfile(userService.getProfile());
     setRecentlyViewed(productService.getRecentlyViewed());
+
+    const storedUser = localStorage.getItem("premium_petshop_user");
+    if (storedUser) {
+      try { setUser(JSON.parse(storedUser)); } catch { setUser(null); }
+    }
 
     const storedCart = localStorage.getItem("premium_petshop_cart");
     if (storedCart) {
@@ -95,7 +101,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addToCart = (product: Product, quantity = 1) => {
-    // Check stock
     const availableStock = product.stock;
     if (availableStock <= 0) {
       addToast(`${product.name} is out of stock!`, "error");
@@ -182,7 +187,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = (newProfile: UserProfile) => {
-    setProfile(newProfile);
+    setUser(newProfile);
+    localStorage.setItem("premium_petshop_user", JSON.stringify(newProfile));
     userService.updateProfile(newProfile);
     addToast("Profile updated successfully!", "success");
   };
@@ -192,13 +198,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRecentlyViewed(productService.getRecentlyViewed());
   };
 
+  const login = (email: string, role: "admin" | "customer") => {
+    const defaultProfile = userService.getProfile();
+    const mockUser: UserProfile = {
+      ...defaultProfile,
+      email,
+      name: role === "admin" ? "Store Administrator" : defaultProfile.name,
+      avatar: role === "admin" 
+        ? "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"
+        : defaultProfile.avatar
+    };
+    
+    // Save to states
+    setUser(mockUser);
+    localStorage.setItem("premium_petshop_user", JSON.stringify(mockUser));
+    addToast(`Signed in successfully as ${mockUser.name}!`, "success");
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("premium_petshop_user");
+    addToast("Logged out successfully.", "info");
+  };
+
   return (
     <AppContext.Provider
       value={{
         products,
         cart,
         wishlist,
-        profile,
+        user,
         recentlyViewed,
         toasts,
         cartOpen,
@@ -214,6 +243,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateProfile,
         refreshProducts,
         trackProductView,
+        login,
+        logout,
       }}
     >
       {children}

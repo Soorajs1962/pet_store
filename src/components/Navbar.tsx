@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { ShoppingBag, Heart, User, Search, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar() {
-  const { cart, wishlist, setCartOpen } = useApp();
+  const { cart, wishlist, setCartOpen, user } = useApp();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -99,10 +100,14 @@ export default function Navbar() {
             {/* Profile */}
             <Link
               href="/account"
-              className="text-secondary hover:text-primary transition-colors hidden sm:block"
+              className="text-secondary hover:text-primary transition-colors hidden sm:block relative w-5 h-5 rounded-full overflow-hidden border border-border-brand"
               aria-label="Account profile"
             >
-              <User className="w-5 h-5" />
+              {user ? (
+                <Image src={user.avatar} alt={user.name} fill className="object-cover" />
+              ) : (
+                <User className="w-5 h-5" />
+              )}
             </Link>
 
             {/* Wishlist */}

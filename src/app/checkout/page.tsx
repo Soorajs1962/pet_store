@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import { orderService } from "@/lib/services/storeService";
@@ -10,30 +11,65 @@ import { Check, ArrowRight, ArrowLeft, CreditCard, Shield, Truck, Sparkles } fro
 import { motion } from "framer-motion";
 
 export default function Checkout() {
-  const { cart, clearCart, addToast } = useApp();
+  const { cart, clearCart, addToast, user } = useApp();
+  const router = useRouter();
 
   // Multi-step state: 1: Shipping, 2: Payment, 3: Success
   const [step, setStep] = useState(1);
 
   // Form State
   const [shippingForm, setShippingForm] = useState({
-    fullName: "Alexander Mercer",
-    addressLine1: "742 Evergreen Terrace",
-    city: "Springfield",
-    postalCode: "97477",
-    country: "United States",
-    email: "alexander@mercer.com",
-    phone: "+1 (555) 892-0192"
+    fullName: "",
+    addressLine1: "",
+    city: "",
+    postalCode: "",
+    country: "",
+    email: "",
+    phone: ""
   });
 
   const [paymentForm, setPaymentForm] = useState({
     cardNumber: "•••• •••• •••• 4242",
     expiry: "12/28",
     cvv: "•••",
-    cardName: "Alexander Mercer"
+    cardName: ""
   });
 
+  // Auth Redirect Gate
+  useEffect(() => {
+    if (!user) {
+      router.push("/login?redirect=/checkout");
+    }
+  }, [user, router]);
+
+  // Sync shipping info if user is loaded
+  useEffect(() => {
+    if (user) {
+      setShippingForm({
+        fullName: user.name,
+        addressLine1: user.addresses[0]?.addressLine1 || "",
+        city: user.addresses[0]?.city || "",
+        postalCode: user.addresses[0]?.postalCode || "",
+        country: user.addresses[0]?.country || "",
+        email: user.email,
+        phone: user.phone
+      });
+      setPaymentForm(prev => ({
+        ...prev,
+        cardName: user.name
+      }));
+    }
+  }, [user]);
+
   const [orderNumber, setOrderNumber] = useState("");
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <span className="text-secondary font-light animate-pulse">Redirecting to login...</span>
+      </div>
+    );
+  }
 
   const subtotal = cart.reduce((acc, item) => {
     const hasDiscount = !!item.product.discount;

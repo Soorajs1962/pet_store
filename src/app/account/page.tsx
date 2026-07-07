@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import { productService, orderService } from "@/lib/services/storeService";
@@ -11,11 +11,12 @@ import ProductCard from "@/components/ProductCard";
 import QuickViewModal from "@/components/QuickViewModal";
 import CartDrawer from "@/components/CartDrawer";
 import { Product } from "@/lib/types";
-import { User, Heart, ShoppingBag, Sliders, Plus, Edit2, Trash2, Check, AlertTriangle, AlertCircle } from "lucide-react";
+import { User, Heart, ShoppingBag, Sliders, Plus, Trash2, Check, AlertTriangle, AlertCircle, LogOut } from "lucide-react";
 
 function AccountContent() {
-  const { profile, updateProfile, wishlist, products, refreshProducts, addToast } = useApp();
+  const { user, updateProfile, wishlist, products, refreshProducts, addToast, logout } = useApp();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState("profile");
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -28,31 +29,65 @@ function AccountContent() {
     }
   }, [searchParams]);
 
-  // Edit Profile Form
+  // Auth Redirect Gate
+  useEffect(() => {
+    if (!user) {
+      router.push("/login?redirect=/account");
+    }
+  }, [user, router]);
+
+  // Edit Profile Form state
   const [profileForm, setProfileForm] = useState({
-    name: profile.name,
-    email: profile.email,
-    phone: profile.phone
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || ""
   });
+
+  // Sync form when user state mounts/changes
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        name: user.name,
+        email: user.email,
+        phone: user.phone
+      });
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <span className="text-secondary font-light animate-pulse">Redirecting to login...</span>
+      </div>
+    );
+  }
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfile({
-      ...profile,
+      ...user,
       name: profileForm.name,
       email: profileForm.email,
       phone: profileForm.phone
     });
   };
 
-  // Wishlist products
-  const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
 
-  // Past Orders
+  const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
   const pastOrders = orderService.getOrders();
+  const isAdmin = user.email === "admin@aurapet.com";
+
+  // If normal user tries to access /account?tab=admin, kick them to profile tab
+  if (activeTab === "admin" && !isAdmin) {
+    setActiveTab("profile");
+  }
 
   // ----------------------------------------------------
-  // ADMIN PANEL LOGIC & STATE
+  // ADMIN PANEL STATE & ACTIONS
   // ----------------------------------------------------
   const [newProductForm, setNewProductForm] = useState({
     name: "",
@@ -88,7 +123,7 @@ function AccountContent() {
     });
 
     addToast(`Successfully created ${newProductForm.name}!`, "success");
-    refreshProducts(); // reload catalog in context
+    refreshProducts();
     setNewProductForm({
       name: "",
       category: "Beds",
@@ -104,10 +139,7 @@ function AccountContent() {
   const handleUpdateStock = (productId: string, newStock: number) => {
     const prod = products.find(p => p.id === productId);
     if (prod) {
-      productService.updateProduct({
-        ...prod,
-        stock: newStock
-      });
+      productService.updateProduct({ ...prod, stock: newStock });
       refreshProducts();
       addToast("Inventory updated.", "success");
     }
@@ -116,10 +148,7 @@ function AccountContent() {
   const handleUpdatePrice = (productId: string, newPrice: number) => {
     const prod = products.find(p => p.id === productId);
     if (prod) {
-      productService.updateProduct({
-        ...prod,
-        price: newPrice
-      });
+      productService.updateProduct({ ...prod, price: newPrice });
       refreshProducts();
       addToast("Price updated.", "success");
     }
@@ -147,19 +176,22 @@ function AccountContent() {
             <div className="lg:col-span-1 bg-white border border-border-brand rounded-2xl p-6 h-fit shadow-sm space-y-2">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border-brand">
                 <div className="relative w-12 h-12 rounded-full overflow-hidden border border-border-brand">
-                  <Image src={profile.avatar} alt={profile.name} fill className="object-cover" />
+                  <Image src={user.avatar} alt={user.name} fill className="object-cover" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-primary leading-tight">{profile.name}</h4>
-                  <span className="text-xs text-secondary font-light">Loyal Member</span>
+                  <h4 className="font-bold text-sm text-primary leading-tight truncate max-w-[150px]">{user.name}</h4>
+                  <span className="text-xs text-secondary font-light">
+                    {isAdmin ? "Store Owner" : "Loyal Member"}
+                  </span>
                 </div>
               </div>
 
+              {/* Account Tabs */}
               {[
                 { id: "profile", label: "My Profile", icon: <User className="w-4 h-4" /> },
                 { id: "wishlist", label: "Wishlist Collection", icon: <Heart className="w-4 h-4" /> },
                 { id: "orders", label: "Purchase History", icon: <ShoppingBag className="w-4 h-4" /> },
-                { id: "admin", label: "Store Admin Panel", icon: <Sliders className="w-4 h-4" /> }
+                ...(isAdmin ? [{ id: "admin", label: "Store Admin Panel", icon: <Sliders className="w-4 h-4" /> }] : [])
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -173,13 +205,20 @@ function AccountContent() {
                   {tab.icon} {tab.label}
                 </button>
               ))}
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 text-sm py-2.5 px-4 rounded-xl text-red-500 hover:bg-red-50 transition-all cursor-pointer border-t border-border-brand mt-4 pt-4"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out
+              </button>
             </div>
 
             {/* Main Workspace */}
             <div className="lg:col-span-3">
               {activeTab === "profile" && (
                 /* PROFILE TAB */
-                <div className="bg-white border border-border-brand rounded-3xl p-8 shadow-sm space-y-8">
+                <div className="bg-white border border-border-brand rounded-3xl p-8 shadow-sm space-y-8 animate-fade-in">
                   <div>
                     <h3 className="font-sans font-bold text-lg text-primary border-b border-border-brand pb-4 mb-6">
                       Personal Details
@@ -232,7 +271,7 @@ function AccountContent() {
                       Saved Addresses
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {profile.addresses.map((addr) => (
+                      {user.addresses.map((addr) => (
                         <div key={addr.id} className="border border-border-brand rounded-2xl p-5 relative">
                           <span className="text-[10px] uppercase font-bold text-accent mb-2 block flex items-center gap-1">
                             <Check className="w-3.5 h-3.5" /> Default Shipping Address
@@ -251,7 +290,7 @@ function AccountContent() {
 
               {activeTab === "wishlist" && (
                 /* WISHLIST TAB */
-                <div className="space-y-6">
+                <div className="space-y-6 animate-fade-in">
                   <h3 className="font-sans font-bold text-lg text-primary bg-white border border-border-brand rounded-2xl p-6 shadow-sm">
                     My Wishlist Collection ({wishlistProducts.length})
                   </h3>
@@ -280,7 +319,7 @@ function AccountContent() {
 
               {activeTab === "orders" && (
                 /* ORDERS TAB */
-                <div className="space-y-6">
+                <div className="space-y-6 animate-fade-in">
                   <h3 className="font-sans font-bold text-lg text-primary bg-white border border-border-brand rounded-2xl p-6 shadow-sm">
                     Purchase History ({pastOrders.length})
                   </h3>
@@ -338,13 +377,13 @@ function AccountContent() {
                 </div>
               )}
 
-              {activeTab === "admin" && (
+              {activeTab === "admin" && isAdmin && (
                 /* ADMIN/INVENTORY TAB */
-                <div className="space-y-8">
+                <div className="space-y-8 animate-fade-in">
                   {/* Stock Alerts Card */}
                   <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm">
                     <h3 className="font-sans font-bold text-base text-primary mb-4 flex items-center gap-2">
-                      <AlertTriangle className="w-5 h-5 text-amber-500" /> Stock Monitor & Alerts
+                      <Sliders className="w-5 h-5 text-accent" /> Stock Monitor & Alerts
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {products.filter(p => p.stock <= 8).length === 0 ? (
