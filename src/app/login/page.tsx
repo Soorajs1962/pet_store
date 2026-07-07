@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -14,8 +15,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/account";
 
-  const [username, setUsername] = useState("alexander@mercer.com");
-  const [password, setPassword] = useState("••••••••");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Redirect if already logged in
@@ -28,7 +29,7 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const success = await login(username);
+    const success = await login(username, password);
     setLoading(false);
     if (success) {
       router.push(redirect);
@@ -112,25 +113,32 @@ function LoginForm() {
       <div className="mt-8 pt-6 border-t border-border-brand text-[10px] text-secondary font-light space-y-2">
         <span className="font-bold text-primary block uppercase tracking-wider">Demo Access Credentials:</span>
         <div className="flex justify-between">
-          <span>Customer Email:</span>
-          <span className="font-mono text-primary">alexander@mercer.com</span>
+          <span>Customer Login:</span>
+          <span className="font-mono text-primary">alexander@mercer.com or +91 98765 43210</span>
         </div>
         <div className="flex justify-between">
-          <span>Customer Phone:</span>
-          <span className="font-mono text-primary">+91 98765 43210</span>
+          <span>Customer Password:</span>
+          <span className="font-mono text-primary">customer123</span>
         </div>
         <hr className="border-border-brand my-1" />
         <div className="flex justify-between">
-          <span>Admin Email:</span>
-          <span className="font-mono text-primary">admin@aurapet.com</span>
+          <span>Admin Login:</span>
+          <span className="font-mono text-primary">admin@aurapet.com or +91 99999 99999</span>
         </div>
         <div className="flex justify-between">
-          <span>Admin Phone:</span>
-          <span className="font-mono text-primary">+91 99999 99999</span>
+          <span>Admin Password:</span>
+          <span className="font-mono text-primary">admin123</span>
         </div>
         <span className="block text-secondary/60 leading-normal pt-1">
-          *Type any password to log in. You can also sign in with any other email/phone number to dynamically generate a new profile.
+          *Demo credentials are fully locked down. You can also create a new account using the Sign Up link below.
         </span>
+      </div>
+
+      <div className="mt-6 text-center text-xs font-light text-secondary">
+        Don't have an account?{" "}
+        <Link href="/signup" className="font-bold text-primary hover:underline">
+          Sign Up
+        </Link>
       </div>
     </div>
   );

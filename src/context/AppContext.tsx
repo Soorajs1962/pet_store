@@ -32,7 +32,7 @@ interface AppContextType {
   updateProfile: (profile: UserProfile) => void;
   refreshProducts: () => void;
   trackProductView: (productId: string) => void;
-  login: (username: string) => Promise<boolean>;
+  login: (username: string, password: string) => Promise<boolean>;
   googleLogin: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -224,11 +224,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRecentlyViewed(productService.getRecentlyViewed());
   };
 
-  const login = async (username: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<boolean> => {
     try {
       const result = await signIn("credentials", {
         username,
-        password: "password",
+        password,
         redirect: false
       });
       if (result?.error) {

@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { cookies } from "next/headers";
 
 const handler = NextAuth({
   providers: [
@@ -16,10 +17,13 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials) return null;
-        const { username } = credentials;
+        const { username, password } = credentials;
         
-        // Admin credentials matching either email or custom Indian phone format
-        if (username === "admin@aurapet.com" || username === "+91 99999 99999" || username === "9999999999") {
+        // Admin credentials matching either email or custom Indian phone format (Secret Password Required)
+        if (
+          (username === "admin@aurapet.com" || username === "+91 99999 99999" || username === "9999999999") &&
+          password === "admin123"
+        ) {
           return {
             id: "admin-id",
             name: "Store Administrator",
@@ -29,8 +33,11 @@ const handler = NextAuth({
           };
         }
         
-        // Customer credentials matching either email or local Indiranagar default phone number
-        if (username === "alexander@mercer.com" || username === "+91 98765 43210" || username === "9876543210") {
+        // Customer credentials matching either email or local Indiranagar default phone number (Secret Password Required)
+        if (
+          (username === "alexander@mercer.com" || username === "+91 98765 43210" || username === "9876543210") &&
+          password === "customer123"
+        ) {
           return {
             id: "customer-id",
             name: "Alexander Mercer",
@@ -39,18 +46,34 @@ const handler = NextAuth({
             avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
           };
         }
+
+        // Validate against registered cookie users database
+        const cookieStore = await cookies();
+        const existingUsersRaw = cookieStore.get("aura_pet_users")?.value;
+        if (existingUsersRaw) {
+          try {
+            const users = JSON.parse(existingUsersRaw);
+            const foundUser = users.find(
+              (u: any) => 
+                (u.username.toLowerCase() === username.toLowerCase() || u.phone === username) &&
+                u.password === password
+            );
+            if (foundUser) {
+              return {
+                id: `dynamic-${Date.now()}`,
+                name: foundUser.name,
+                email: foundUser.username.includes("@") ? foundUser.username : `${foundUser.username}@aurapet.com`,
+                role: "customer",
+                avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+              };
+            }
+          } catch {
+            // Ignore error
+          }
+        }
         
-        // Generate dynamic customer profile if they sign in with any other credentials
-        const isEmail = username.includes("@");
-        const displayName = isEmail ? username.split("@")[0] : "Premium Customer";
-        
-        return {
-          id: `dynamic-${Date.now()}`,
-          name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
-          email: isEmail ? username : `${username}@aurapet.com`,
-          role: "customer",
-          avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
-        };
+        // If credentials don't match, return null to fail sign-in
+        return null;
       }
     })
   ],
