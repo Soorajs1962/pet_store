@@ -107,7 +107,7 @@ export default function Checkout() {
           postalCode: shippingForm.postalCode,
           country: shippingForm.country
         }
-      });
+      }, user?.email);
       setOrderNumber(order.id);
       setStep(3);
       clearCart();

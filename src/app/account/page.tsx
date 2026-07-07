@@ -174,7 +174,7 @@ function AccountContent() {
   };
 
   const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
-  const pastOrders = orderService.getOrders();
+  const pastOrders = orderService.getOrders(user?.email);
   const isAdmin = user?.email === "admin@aurapet.com";
 
   // If normal user tries to access /account?tab=admin, kick them to profile tab

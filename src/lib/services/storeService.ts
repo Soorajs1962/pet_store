@@ -151,9 +151,10 @@ export const productService = {
 // ORDER SERVICE
 // ----------------------------------------------------
 export const orderService = {
-  getOrders(): Order[] {
+  getOrders(email?: string): Order[] {
     if (!isClient) return [];
-    const stored = localStorage.getItem(ORDERS_KEY);
+    const key = email ? `premium_petshop_orders_${email}` : ORDERS_KEY;
+    const stored = localStorage.getItem(key);
     if (!stored) return [];
     try {
       return JSON.parse(stored);
@@ -162,8 +163,8 @@ export const orderService = {
     }
   },
 
-  createOrder(orderData: Omit<Order, "id" | "date" | "status">): Order {
-    const orders = this.getOrders();
+  createOrder(orderData: Omit<Order, "id" | "date" | "status">, email?: string): Order {
+    const orders = this.getOrders(email);
     const order: Order = {
       ...orderData,
       id: `ord-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -178,7 +179,8 @@ export const orderService = {
 
     orders.unshift(order);
     if (isClient) {
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+      const key = email ? `premium_petshop_orders_${email}` : ORDERS_KEY;
+      localStorage.setItem(key, JSON.stringify(orders));
     }
     return order;
   }
