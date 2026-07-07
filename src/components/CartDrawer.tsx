@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
+import { siteConfig } from "@/config/site";
 import { X, Plus, Minus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function CartDrawer() {
   const { cart, cartOpen, setCartOpen, updateQuantity, removeFromCart } = useApp();
   const [couponCode, setCouponCode] = useState("");
-  const [appliedDiscount, setAppliedDiscount] = useState(0); // in dollars
+  const [appliedDiscount, setAppliedDiscount] = useState(0); 
   const [couponError, setCouponError] = useState("");
 
   // Lock background scroll when drawer is open
@@ -33,13 +34,13 @@ export default function CartDrawer() {
     return acc + finalPrice * item.quantity;
   }, 0);
 
-  const shipping = subtotal > 50 || subtotal === 0 ? 0 : 9.99;
+  const shipping = subtotal >= siteConfig.commerce.freeShippingThreshold || subtotal === 0 ? 0 : siteConfig.commerce.defaultShippingCost;
   const total = Math.max(0, subtotal + shipping - appliedDiscount);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
-    if (couponCode.toUpperCase() === "AURAPET10") {
-      setAppliedDiscount(subtotal * 0.1);
+    if (couponCode.toUpperCase() === siteConfig.commerce.discountPromoCode) {
+      setAppliedDiscount(subtotal * siteConfig.commerce.discountRate);
       setCouponError("");
     } else {
       setCouponError("Invalid coupon code.");
@@ -157,11 +158,11 @@ export default function CartDrawer() {
                       </div>
                       <div className="text-right">
                         <span className="text-sm font-bold text-primary block">
-                          ₹{(finalPrice * item.quantity).toFixed(2)}
+                          {siteConfig.commerce.currencySymbol}{(finalPrice * item.quantity).toFixed(2)}
                         </span>
                         {hasDiscount && (
                           <span className="text-[10px] text-secondary line-through">
-                            ₹{(item.product.price * item.quantity).toFixed(2)}
+                            {siteConfig.commerce.currencySymbol}{(item.product.price * item.quantity).toFixed(2)}
                           </span>
                         )}
                       </div>
@@ -180,7 +181,7 @@ export default function CartDrawer() {
             <form onSubmit={handleApplyCoupon} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Promo Code (AURAPET10)"
+                placeholder={`Promo Code (${siteConfig.commerce.discountPromoCode})`}
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value)}
                 className="flex-1 text-xs border border-border-brand rounded-full px-4 py-2 bg-white outline-none focus:border-primary text-primary font-medium"
@@ -194,7 +195,7 @@ export default function CartDrawer() {
             </form>
             {appliedDiscount > 0 && (
               <span className="text-[10px] text-accent font-semibold block">
-                Coupon applied successfully: 10% Discount!
+                Coupon applied successfully: {siteConfig.commerce.discountRate * 100}% Discount!
               </span>
             )}
             {couponError && (
@@ -207,21 +208,21 @@ export default function CartDrawer() {
             <div className="space-y-2 text-xs pt-2">
               <div className="flex justify-between text-secondary">
                 <span>Subtotal</span>
-                <span>₹{subtotal.toFixed(2)}</span>
+                <span>{siteConfig.commerce.currencySymbol}{subtotal.toFixed(2)}</span>
               </div>
               {appliedDiscount > 0 && (
                 <div className="flex justify-between text-accent font-medium">
                   <span>Discount</span>
-                  <span>-₹{appliedDiscount.toFixed(2)}</span>
+                  <span>-{siteConfig.commerce.currencySymbol}{appliedDiscount.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-secondary">
                 <span>Estimated Shipping</span>
-                <span>{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
+                <span>{shipping === 0 ? "Free" : `${siteConfig.commerce.currencySymbol}${shipping.toFixed(2)}`}</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-primary border-t border-border-brand pt-2">
                 <span>Estimated Total</span>
-                <span>₹{total.toFixed(2)}</span>
+                <span>{siteConfig.commerce.currencySymbol}{total.toFixed(2)}</span>
               </div>
             </div>
 

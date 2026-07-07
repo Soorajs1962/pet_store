@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
+import { siteConfig } from "@/config/site";
 import { orderService } from "@/lib/services/storeService";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -79,7 +80,7 @@ export default function Checkout() {
     return acc + finalPrice * item.quantity;
   }, 0);
 
-  const shipping = subtotal > 50 || subtotal === 0 ? 0 : 9.99;
+  const shipping = subtotal >= siteConfig.commerce.freeShippingThreshold || subtotal === 0 ? 0 : siteConfig.commerce.defaultShippingCost;
   const total = subtotal + shipping;
 
   const handleNextStep = (e: React.FormEvent) => {
@@ -338,7 +339,7 @@ export default function Checkout() {
                       type="submit"
                       className="w-full py-3.5 px-6 rounded-full bg-primary hover:bg-accent text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
-                      Authorize Payment • ₹{total.toFixed(2)}
+                      Authorize Payment • {siteConfig.commerce.currencySymbol}{total.toFixed(2)}
                     </button>
                   </form>
                 )}
@@ -369,7 +370,7 @@ export default function Checkout() {
                               {item.quantity}x
                             </span>
                             <span className="flex-1 text-secondary font-light truncate">{item.product.name}</span>
-                            <span className="font-bold text-primary">₹{(finalPrice * item.quantity).toFixed(2)}</span>
+                            <span className="font-bold text-primary">{siteConfig.commerce.currencySymbol}{(finalPrice * item.quantity).toFixed(2)}</span>
                           </div>
                         );
                       })}
@@ -382,17 +383,17 @@ export default function Checkout() {
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between text-secondary">
                       <span>Subtotal</span>
-                      <span className="font-medium text-primary">₹{subtotal.toFixed(2)}</span>
+                      <span className="font-medium text-primary">{siteConfig.commerce.currencySymbol}{subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-secondary">
                       <span>Standard Shipping</span>
                       <span className="font-medium text-primary">
-                        {shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}
+                        {shipping === 0 ? "Free" : `${siteConfig.commerce.currencySymbol}${shipping.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm font-bold text-primary border-t border-border-brand pt-3 mt-3">
                       <span>Grand Total</span>
-                      <span>₹{total.toFixed(2)}</span>
+                      <span>{siteConfig.commerce.currencySymbol}{total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
