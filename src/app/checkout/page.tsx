@@ -12,11 +12,12 @@ import { Check, ArrowRight, ArrowLeft, CreditCard, Shield, Truck, Sparkles } fro
 import { motion } from "framer-motion";
 
 export default function Checkout() {
-  const { cart, clearCart, addToast, user } = useApp();
+  const { cart, clearCart, addToast, user, updateProfile } = useApp();
   const router = useRouter();
 
   // Multi-step state: 1: Shipping, 2: Payment, 3: Success
   const [step, setStep] = useState(1);
+  const [saveAddressToProfile, setSaveAddressToProfile] = useState(true);
 
   // Form State
   const [shippingForm, setShippingForm] = useState({
@@ -108,6 +109,32 @@ export default function Checkout() {
           country: shippingForm.country
         }
       }, user?.email);
+
+      // Save address to profile if user checked the box and it doesn't already exist
+      if (saveAddressToProfile && user) {
+        const addressExists = user.addresses.some(
+          (addr) =>
+            addr.addressLine1.toLowerCase().trim() === shippingForm.addressLine1.toLowerCase().trim() &&
+            addr.city.toLowerCase().trim() === shippingForm.city.toLowerCase().trim()
+        );
+
+        if (!addressExists) {
+          const newAddress = {
+            id: `addr-${Date.now()}`,
+            isDefault: user.addresses.length === 0,
+            fullName: shippingForm.fullName,
+            addressLine1: shippingForm.addressLine1,
+            city: shippingForm.city,
+            postalCode: shippingForm.postalCode,
+            country: shippingForm.country
+          };
+          updateProfile({
+            ...user,
+            addresses: [...user.addresses, newAddress]
+          });
+        }
+      }
+
       setOrderNumber(order.id);
       setStep(3);
       clearCart();
@@ -258,12 +285,23 @@ export default function Checkout() {
                         />
                       </div>
                     </div>
-                    <button
-                      type="submit"
-                      className="w-full mt-4 py-3.5 px-6 rounded-full bg-primary hover:bg-secondary text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      Proceed to Payment <ArrowRight className="w-4 h-4" />
-                    </button>
+                     <div className="flex items-center pt-2">
+                       <label className="flex items-center gap-2.5 text-xs text-primary font-medium cursor-pointer select-none">
+                         <input
+                           type="checkbox"
+                           checked={saveAddressToProfile}
+                           onChange={(e) => setSaveAddressToProfile(e.target.checked)}
+                           className="accent-primary w-4 h-4 rounded cursor-pointer"
+                         />
+                         Save this address to my profile for future checkouts
+                       </label>
+                     </div>
+                     <button
+                       type="submit"
+                       className="w-full mt-2 py-3.5 px-6 rounded-full bg-primary hover:bg-secondary text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                     >
+                       Proceed to Payment <ArrowRight className="w-4 h-4" />
+                     </button>
                   </form>
                 ) : (
                   /* STEP 2: PAYMENT & BILLING */
