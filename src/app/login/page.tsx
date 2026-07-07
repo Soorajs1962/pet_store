@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import Navbar from "@/components/Navbar";
@@ -18,9 +18,11 @@ function LoginForm() {
   const [password, setPassword] = useState("••••••••");
 
   // Redirect if already logged in
-  if (user) {
-    router.push(redirect);
-  }
+  useEffect(() => {
+    if (user) {
+      router.push(redirect);
+    }
+  }, [user, router, redirect]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
