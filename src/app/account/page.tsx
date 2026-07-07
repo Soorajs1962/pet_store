@@ -54,16 +54,11 @@ function AccountContent() {
     }
   }, [user]);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <span className="text-secondary font-light animate-pulse">Redirecting to login...</span>
-      </div>
-    );
-  }
+  
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     updateProfile({
       ...user,
       name: profileForm.name,
@@ -79,7 +74,7 @@ function AccountContent() {
 
   const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
   const pastOrders = orderService.getOrders();
-  const isAdmin = user.email === "admin@aurapet.com";
+  const isAdmin = user?.email === "admin@aurapet.com";
 
   // If normal user tries to access /account?tab=admin, kick them to profile tab
   if (activeTab === "admin" && !isAdmin) {
@@ -162,6 +157,14 @@ function AccountContent() {
       addToast("Product deleted.", "info");
     }
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <span className="text-secondary font-light animate-pulse">Redirecting to login...</span>
+      </div>
+    );
+  }
 
   return (
     <>
