@@ -7,11 +7,11 @@ export const siteConfig = {
   // Contact details
   contact: {
     email: "concierge@aurapet.com",
-    phone: "+1 (555) 892-0192",
-    address: "742 Evergreen Terrace, Springfield, 97477 USA",
+    phone: "+91 98765 43210",
+    address: "Plot No. 42, HSR Layout, Sector 5, Bengaluru, Karnataka 560102 India",
     hours: {
-      weekdays: "09:00 - 18:00 EST",
-      saturday: "10:00 - 15:00 EST",
+      weekdays: "09:00 - 18:00 IST",
+      saturday: "10:00 - 15:00 IST",
       sunday: "Closed"
     }
   },

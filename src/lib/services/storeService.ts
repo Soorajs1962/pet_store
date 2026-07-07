@@ -13,16 +13,16 @@ const defaultProfile: UserProfile = {
   name: "Alexander Mercer",
   email: "alexander@mercer.com",
   avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-  phone: "+1 (555) 892-0192",
+  phone: "+91 98765 43210",
   addresses: [
     {
       id: "addr-1",
       isDefault: true,
       fullName: "Alexander Mercer",
-      addressLine1: "742 Evergreen Terrace",
-      city: "Springfield",
-      postalCode: "97477",
-      country: "United States"
+      addressLine1: "Flat 402, Block B, Prestige Heights, Indiranagar",
+      city: "Bengaluru, Karnataka",
+      postalCode: "560038",
+      country: "India"
     }
   ],
   savedCards: [
