@@ -33,6 +33,21 @@ const handler = NextAuth({
           };
         }
         
+        // Staff credentials matching email or default phone number
+        if (
+          (username === "staff@aurapet.com" || username === "+91 88888 88888" || username === "8888888888") &&
+          password === "staff123"
+        ) {
+          return {
+            id: "staff-id",
+            name: "Store Staff Member",
+            email: "staff@aurapet.com",
+            role: "staff",
+            avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80",
+            phone: "+91 88888 88888"
+          };
+        }
+
         // Customer credentials matching either email or local Indiranagar default phone number (Secret Password Required)
         if (
           (username === "alexander@mercer.com" || username === "+91 98765 43210" || username === "9876543210") &&

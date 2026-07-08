@@ -68,6 +68,7 @@ export interface UserProfile {
   email: string;
   avatar: string;
   phone: string;
+  role?: "customer" | "staff" | "admin";
   addresses: Array<{
     id: string;
     isDefault: boolean;

@@ -175,12 +175,95 @@ function AccountContent() {
 
   const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
   const pastOrders = orderService.getOrders(user?.email);
-  const isAdmin = user?.email === "admin@aurapet.com";
+  const isAdmin = user?.email === "admin@aurapet.com" || user?.role === "admin";
+  const isStaff = user?.email === "staff@aurapet.com" || user?.role === "staff";
+  const isStaffOrAdmin = isAdmin || isStaff;
 
   // If normal user tries to access /account?tab=admin, kick them to profile tab
-  if (activeTab === "admin" && !isAdmin) {
+  if (activeTab === "admin" && !isStaffOrAdmin) {
     setActiveTab("profile");
   }
+
+  // Admin panel subtab: "products" | "team"
+  const [adminSubTab, setAdminSubTab] = useState("products");
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [showTeamForm, setShowTeamForm] = useState(false);
+  const [teamForm, setTeamForm] = useState({
+    name: "",
+    username: "",
+    phone: "",
+    password: "",
+    role: "staff"
+  });
+
+  const fetchTeamMembers = async () => {
+    try {
+      const res = await fetch("/api/auth/team");
+      const data = await res.json();
+      if (data.success) {
+        setTeamMembers(data.team);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "admin") {
+      fetchTeamMembers();
+    }
+  }, [activeTab]);
+
+  const handleSaveTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/auth/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teamForm)
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast("Team member updated successfully.", "success");
+        fetchTeamMembers();
+        setShowTeamForm(false);
+        setTeamForm({
+          name: "",
+          username: "",
+          phone: "",
+          password: "",
+          role: "staff"
+        });
+      } else {
+        addToast(data.error || "Failed to update member.", "error");
+      }
+    } catch {
+      addToast("Connection error.", "error");
+    }
+  };
+
+  const handleDeleteTeamMember = async (username: string) => {
+    if (username.toLowerCase() === "admin@aurapet.com" || username.toLowerCase() === "staff@aurapet.com") {
+      addToast("Cannot delete default seeded team members.", "error");
+      return;
+    }
+    if (confirm(`Remove ${username} from team?`)) {
+      try {
+        const res = await fetch("/api/auth/team", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.success) {
+          addToast("Member removed from team.", "info");
+          fetchTeamMembers();
+        }
+      } catch {
+        addToast("Connection error.", "error");
+      }
+    }
+  };
 
   // ----------------------------------------------------
   // ADMIN PANEL STATE & ACTIONS
@@ -285,7 +368,7 @@ function AccountContent() {
                 <div>
                   <h4 className="font-bold text-sm text-primary leading-tight truncate max-w-[150px]">{user.name}</h4>
                   <span className="text-xs text-secondary font-light">
-                    {isAdmin ? "Store Owner" : "Loyal Member"}
+                    {isAdmin ? "Store Owner" : isStaff ? "Store Staff" : "Loyal Member"}
                   </span>
                 </div>
               </div>
@@ -295,7 +378,7 @@ function AccountContent() {
                 { id: "profile", label: "My Profile", icon: <User className="w-4 h-4" /> },
                 { id: "wishlist", label: "Wishlist Collection", icon: <Heart className="w-4 h-4" /> },
                 { id: "orders", label: "Purchase History", icon: <ShoppingBag className="w-4 h-4" /> },
-                ...(isAdmin ? [{ id: "admin", label: "Store Admin Panel", icon: <Sliders className="w-4 h-4" /> }] : [])
+                ...((isAdmin || isStaff) ? [{ id: "admin", label: "Store Admin Panel", icon: <Sliders className="w-4 h-4" /> }] : [])
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -628,197 +711,384 @@ function AccountContent() {
                 </div>
               )}
 
-              {activeTab === "admin" && isAdmin && (
+              {activeTab === "admin" && isStaffOrAdmin && (
                 /* ADMIN/INVENTORY TAB */
                 <div className="space-y-8 animate-fade-in">
-                  {/* Stock Alerts Card */}
-                  <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm">
-                    <h3 className="font-sans font-bold text-base text-primary mb-4 flex items-center gap-2">
-                      <Sliders className="w-5 h-5 text-accent" /> Stock Monitor & Alerts
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {products.filter(p => p.stock <= 8).length === 0 ? (
-                        <div className="sm:col-span-2 border border-accent/20 bg-accent/5 p-4 rounded-xl flex items-center gap-3 text-xs text-accent">
-                          <Check className="w-4 h-4 shrink-0" />
-                          <span>All products are well stocked! No shortages detected.</span>
-                        </div>
-                      ) : (
-                        products.filter(p => p.stock <= 8).map(p => (
-                          <div
-                            key={p.id}
-                            className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs ${
-                              p.stock === 0
-                                ? "bg-red-50/70 border-red-200 text-red-700"
-                                : "bg-amber-50/70 border-amber-200 text-amber-700"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              {p.stock === 0 ? <AlertCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                              <div>
-                                <span className="font-bold block truncate max-w-[150px]">{p.name}</span>
-                                <span>Status: {p.stock === 0 ? "Out of Stock" : `${p.stock} units left`}</span>
-                              </div>
+                  {/* Admin Sub-Tabs */}
+                  <div className="flex border-b border-border-brand mb-6 gap-6">
+                    <button
+                      onClick={() => setAdminSubTab("products")}
+                      className={`pb-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+                        adminSubTab === "products"
+                          ? "border-primary text-primary"
+                          : "border-transparent text-secondary hover:text-primary"
+                      }`}
+                    >
+                      Catalog & Inventory
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setAdminSubTab("team")}
+                        className={`pb-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+                          adminSubTab === "team"
+                            ? "border-primary text-primary"
+                            : "border-transparent text-secondary hover:text-primary"
+                        }`}
+                      >
+                        Team & Roles
+                      </button>
+                    )}
+                  </div>
+
+                  {adminSubTab === "products" && (
+                    <div className="space-y-8 animate-fade-in">
+                      {/* Stock Alerts Card */}
+                      <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm">
+                        <h3 className="font-sans font-bold text-base text-primary mb-4 flex items-center gap-2">
+                          <Sliders className="w-5 h-5 text-accent" /> Stock Monitor & Alerts
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {products.filter(p => p.stock <= 8).length === 0 ? (
+                            <div className="sm:col-span-2 border border-accent/20 bg-accent/5 p-4 rounded-xl flex items-center gap-3 text-xs text-accent">
+                              <Check className="w-4 h-4 shrink-0" />
+                              <span>All products are well stocked! No shortages detected.</span>
                             </div>
-                            <button
-                              onClick={() => handleUpdateStock(p.id, 25)}
-                              className="px-3 py-1 bg-white hover:bg-primary hover:text-white border border-current text-xs font-bold rounded-full transition-all cursor-pointer"
+                          ) : (
+                            products.filter(p => p.stock <= 8).map(p => (
+                              <div
+                                key={p.id}
+                                className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                                  p.stock === 0
+                                    ? "bg-red-50/70 border-red-200 text-red-700"
+                                    : "bg-amber-50/70 border-amber-200 text-amber-700"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {p.stock === 0 ? <AlertCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                                  <div>
+                                    <span className="font-bold block truncate max-w-[150px]">{p.name}</span>
+                                    <span>Status: {p.stock === 0 ? "Out of Stock" : `${p.stock} units left`}</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleUpdateStock(p.id, 25)}
+                                  className="px-3 py-1 bg-white hover:bg-primary hover:text-white border border-current text-xs font-bold rounded-full transition-all cursor-pointer"
+                                >
+                                  Restock (25)
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Add Product Section */}
+                      <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm">
+                        <h3 className="font-sans font-bold text-base text-primary border-b border-border-brand pb-4 mb-6">
+                          Add New Catalog Product
+                        </h3>
+                        <form onSubmit={handleCreateProduct} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="sm:col-span-2">
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Product Name</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Minimalist Ceramic Food Bowl"
+                              value={newProductForm.name}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Category</label>
+                            <select
+                              value={newProductForm.category}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none bg-transparent font-medium text-primary focus:border-primary"
                             >
-                              Restock (25)
+                              {["Beds", "Accessories", "Food", "Treats", "Toys", "Health"].map(c => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Price (₹)</label>
+                            <input
+                              type="number"
+                              required
+                              min={1}
+                              value={newProductForm.price}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, price: Number(e.target.value) })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Initial Stock</label>
+                            <input
+                              type="number"
+                              required
+                              min={0}
+                              value={newProductForm.stock}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, stock: Number(e.target.value) })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Material Specification</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Organic Cotton Linen"
+                              value={newProductForm.material}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, material: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                            />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Image Unsplash URL</label>
+                            <input
+                              type="url"
+                              required
+                              placeholder="https://images.unsplash.com/..."
+                              value={newProductForm.image}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, image: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                            />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Description</label>
+                            <textarea
+                              placeholder="Add premium product specifications and copy here..."
+                              value={newProductForm.description}
+                              onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
+                              className="w-full text-xs border border-border-brand rounded-2xl p-4 outline-none h-24 resize-none font-medium text-primary focus:border-primary"
+                            />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <button
+                              type="submit"
+                              className="px-6 py-2.5 bg-primary hover:bg-accent text-white text-xs font-bold rounded-full transition-colors cursor-pointer"
+                            >
+                              Publish to Catalog
                             </button>
                           </div>
-                        ))
+                        </form>
+                      </div>
+
+                      {/* Complete Catalog List */}
+                      <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-sans font-bold text-base text-primary border-b border-border-brand pb-4">
+                          Complete Product Catalog ({products.length} Items)
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="border-b border-border-brand font-bold text-secondary">
+                                <th className="py-3 pr-2">ID</th>
+                                <th className="py-3">Name</th>
+                                <th className="py-3">Category</th>
+                                <th className="py-3">Price</th>
+                                <th className="py-3">Stock Level</th>
+                                <th className="py-3 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {products.map((p) => (
+                                <tr key={p.id} className="border-b border-border-brand last:border-b-0 hover:bg-background/40">
+                                  <td className="py-3 text-secondary pr-2 font-mono">{p.id}</td>
+                                  <td className="py-3 font-semibold text-primary truncate max-w-[150px]">{p.name}</td>
+                                  <td className="py-3 text-secondary">{p.category}</td>
+                                  <td className="py-3">
+                                    <input
+                                      type="number"
+                                      value={p.price}
+                                      onChange={(e) => handleUpdatePrice(p.id, Number(e.target.value))}
+                                      className="w-16 border border-border-brand rounded px-1.5 py-0.5 text-center font-bold text-primary"
+                                    />
+                                  </td>
+                                  <td className="py-3">
+                                    <input
+                                      type="number"
+                                      value={p.stock}
+                                      onChange={(e) => handleUpdateStock(p.id, Number(e.target.value))}
+                                      className={`w-16 border rounded px-1.5 py-0.5 text-center font-semibold text-primary ${
+                                        p.stock === 0 ? "border-red-300 bg-red-50" : "border-border-brand"
+                                      }`}
+                                    />
+                                  </td>
+                                  <td className="py-3 text-right">
+                                    <button
+                                      onClick={() => handleDeleteProduct(p.id)}
+                                      className="text-secondary hover:text-red-500 transition-colors p-1 cursor-pointer"
+                                      title="Delete Product"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {adminSubTab === "team" && isAdmin && (
+                    <div className="space-y-8 animate-fade-in">
+                      {/* Add Team Member Section */}
+                      <div className="flex items-center justify-between bg-white border border-border-brand rounded-3xl p-6 shadow-sm">
+                        <div>
+                          <h3 className="font-sans font-bold text-base text-primary">Team Management</h3>
+                          <p className="text-xs text-secondary font-light">Add store staff or additional administrators to manage the backend operations.</p>
+                        </div>
+                        {!showTeamForm && (
+                          <button
+                            onClick={() => {
+                              setShowTeamForm(true);
+                              setTeamForm({
+                                name: "",
+                                username: "",
+                                phone: "",
+                                password: "",
+                                role: "staff"
+                              });
+                            }}
+                            className="px-5 py-2 bg-primary hover:bg-secondary text-white text-xs font-bold rounded-full transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Add Member
+                          </button>
+                        )}
+                      </div>
+
+                      {showTeamForm && (
+                        <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm space-y-4 animate-fade-in">
+                          <h4 className="font-bold text-sm text-primary">Create Team Account</h4>
+                          <form onSubmit={handleSaveTeamMember} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Member Name</label>
+                              <input
+                                type="text"
+                                required
+                                value={teamForm.name}
+                                onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })}
+                                className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                                placeholder="e.g. Priyanjali Sen"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Email Address</label>
+                              <input
+                                type="email"
+                                required
+                                value={teamForm.username}
+                                onChange={(e) => setTeamForm({ ...teamForm, username: e.target.value })}
+                                className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                                placeholder="e.g. staff@aurapet.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Phone Number</label>
+                              <input
+                                type="text"
+                                value={teamForm.phone}
+                                onChange={(e) => setTeamForm({ ...teamForm, phone: e.target.value })}
+                                className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                                placeholder="e.g. 9876543210"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Initial Password</label>
+                              <input
+                                type="password"
+                                required
+                                value={teamForm.password}
+                                onChange={(e) => setTeamForm({ ...teamForm, password: e.target.value })}
+                                className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none font-medium text-primary focus:border-primary"
+                                placeholder="Password"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Access Role</label>
+                              <select
+                                value={teamForm.role}
+                                onChange={(e) => setTeamForm({ ...teamForm, role: e.target.value })}
+                                className="w-full text-xs border border-border-brand rounded-full px-4 py-2.5 outline-none bg-transparent font-medium text-primary focus:border-primary"
+                              >
+                                <option value="staff">Staff Member (Catalog management only)</option>
+                                <option value="admin">Administrator (Full admin board accesses)</option>
+                              </select>
+                            </div>
+                            <div className="sm:col-span-3 flex justify-end gap-2 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowTeamForm(false)}
+                                className="px-5 py-2 border border-border-brand hover:bg-white text-primary text-xs font-bold rounded-full transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-5 py-2 bg-primary hover:bg-secondary text-white text-xs font-bold rounded-full transition-colors cursor-pointer"
+                              >
+                                Save Member
+                              </button>
+                            </div>
+                          </form>
+                        </div>
                       )}
-                    </div>
-                  </div>
 
-                  {/* Add Product Section */}
-                  <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm">
-                    <h3 className="font-sans font-bold text-base text-primary border-b border-border-brand pb-4 mb-6">
-                      Add New Catalog Product
-                    </h3>
-                    <form onSubmit={handleCreateProduct} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="sm:col-span-2">
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Product Name</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Minimalist Ceramic Food Bowl"
-                          value={newProductForm.name}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
-                          className="w-full text-sm border border-border-brand rounded-full px-4 py-2.5 outline-none"
-                        />
+                      {/* Team Members List */}
+                      <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-sans font-bold text-base text-primary border-b border-border-brand pb-4">
+                          Active Store Team ({teamMembers.length} Accounts)
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="border-b border-border-brand font-bold text-secondary">
+                                <th className="py-3">Name</th>
+                                <th className="py-3">Email/Username</th>
+                                <th className="py-3">Phone</th>
+                                <th className="py-3">Role</th>
+                                <th className="py-3 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {teamMembers.map((member: any) => (
+                                <tr key={member.username} className="border-b border-border-brand last:border-b-0 hover:bg-background/40">
+                                  <td className="py-3 font-semibold text-primary">{member.name}</td>
+                                  <td className="py-3 text-secondary font-mono">{member.username}</td>
+                                  <td className="py-3 text-secondary">{member.phone || "—"}</td>
+                                  <td className="py-3">
+                                    <span className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wider ${
+                                      member.role === "admin"
+                                        ? "bg-accent/10 text-accent border border-accent/20"
+                                        : "bg-blue-50 text-blue-600 border border-blue-100"
+                                    }`}>
+                                      {member.role}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 text-right">
+                                    {member.username.toLowerCase() !== "admin@aurapet.com" && member.username.toLowerCase() !== "staff@aurapet.com" ? (
+                                      <button
+                                        onClick={() => handleDeleteTeamMember(member.username)}
+                                        className="text-secondary hover:text-red-500 transition-colors p-1 cursor-pointer"
+                                        title="Remove Member"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-secondary/40 select-none pr-1">System Account</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Category</label>
-                        <select
-                          value={newProductForm.category}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
-                          className="w-full text-sm border border-border-brand rounded-full px-4 py-2.5 outline-none bg-transparent"
-                        >
-                          {["Beds", "Accessories", "Food", "Treats", "Toys", "Health"].map(c => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Price (₹)</label>
-                        <input
-                          type="number"
-                          required
-                          min={1}
-                          value={newProductForm.price}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, price: Number(e.target.value) })}
-                          className="w-full text-sm border border-border-brand rounded-full px-4 py-2.5 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Initial Stock</label>
-                        <input
-                          type="number"
-                          required
-                          min={0}
-                          value={newProductForm.stock}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, stock: Number(e.target.value) })}
-                          className="w-full text-sm border border-border-brand rounded-full px-4 py-2.5 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Material Specification</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Organic Cotton Linen"
-                          value={newProductForm.material}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, material: e.target.value })}
-                          className="w-full text-sm border border-border-brand rounded-full px-4 py-2.5 outline-none"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Image Unsplash URL</label>
-                        <input
-                          type="url"
-                          required
-                          placeholder="https://images.unsplash.com/..."
-                          value={newProductForm.image}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, image: e.target.value })}
-                          className="w-full text-sm border border-border-brand rounded-full px-4 py-2.5 outline-none"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider block mb-2">Description</label>
-                        <textarea
-                          placeholder="Add premium product specifications and copy here..."
-                          value={newProductForm.description}
-                          onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
-                          className="w-full text-sm border border-border-brand rounded-2xl p-4 outline-none h-24 resize-none"
-                        />
-                      </div>
-                      <div className="sm:col-span-3">
-                        <button
-                          type="submit"
-                          className="px-6 py-2.5 bg-primary hover:bg-accent text-white text-xs font-bold rounded-full transition-colors cursor-pointer"
-                        >
-                          Publish to Catalog
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Complete Catalog List */}
-                  <div className="bg-white border border-border-brand rounded-3xl p-6 shadow-sm space-y-4">
-                    <h3 className="font-sans font-bold text-base text-primary border-b border-border-brand pb-4">
-                      Complete Product Catalog ({products.length} Items)
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-border-brand font-bold text-secondary">
-                            <th className="py-3 pr-2">ID</th>
-                            <th className="py-3">Name</th>
-                            <th className="py-3">Category</th>
-                            <th className="py-3">Price</th>
-                            <th className="py-3">Stock Level</th>
-                            <th className="py-3 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {products.map((p) => (
-                            <tr key={p.id} className="border-b border-border-brand last:border-b-0 hover:bg-background/40">
-                              <td className="py-3 text-secondary pr-2 font-mono">{p.id}</td>
-                              <td className="py-3 font-semibold text-primary truncate max-w-[150px]">{p.name}</td>
-                              <td className="py-3 text-secondary">{p.category}</td>
-                              <td className="py-3">
-                                <input
-                                  type="number"
-                                  value={p.price}
-                                  onChange={(e) => handleUpdatePrice(p.id, Number(e.target.value))}
-                                  className="w-16 border border-border-brand rounded px-1.5 py-0.5 text-center font-bold"
-                                />
-                              </td>
-                              <td className="py-3">
-                                <input
-                                  type="number"
-                                  value={p.stock}
-                                  onChange={(e) => handleUpdateStock(p.id, Number(e.target.value))}
-                                  className={`w-16 border rounded px-1.5 py-0.5 text-center font-semibold ${
-                                    p.stock === 0 ? "border-red-300 bg-red-50" : "border-border-brand"
-                                  }`}
-                                />
-                              </td>
-                              <td className="py-3 text-right">
-                                <button
-                                  onClick={() => handleDeleteProduct(p.id)}
-                                  className="text-secondary hover:text-red-500 transition-colors p-1 cursor-pointer"
-                                  title="Delete Product"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

@@ -88,6 +88,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           email: email,
           avatar: (session.user as any).avatar || session.user.image || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
           phone: (session.user as any).phone || "",
+          role: (session.user as any).role || (isOwner ? "admin" : "customer"),
           addresses: isOwner ? [
             {
               id: "addr-1",
